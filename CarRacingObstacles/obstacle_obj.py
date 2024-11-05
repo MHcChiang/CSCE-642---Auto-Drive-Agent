@@ -61,16 +61,19 @@ class CarRacingObstacles_v2(CarRacing):
 
         # reward -= 0.05 * np.min([self.car.wheels[0].brake, self.car.wheels[0].gas])  # self.car.wheels[0].brake * 0.05
         # reward -= self.car.wheels[0].brake * 0.2
-        if len(self.contacting) == 0:  # if get off road
-            # reward -= 0.2
-            self.off += 1
-            # print(self.off)
-            if self.off > 50:
-                terminated = True
-        else:
-            self.off = 0
-        # if self.collideObst:
-        #     reward -= 1
+
+        # early stop
+        # if len(self.contacting) == 0:  # if get off road
+        #     # reward -= 0.2
+        #     self.off += 1
+        #     # print(self.off)
+        #     if self.off > 50:
+        #         terminated = True
+        # else:
+        #     self.off = 0
+
+        if self.collideObst:
+            reward -= 0.5
             # print(f"hit, reward: {reward}")
 
         return obs, reward, terminated, truncated, {}

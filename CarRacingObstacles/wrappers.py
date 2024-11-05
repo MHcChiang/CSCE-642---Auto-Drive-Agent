@@ -27,7 +27,7 @@ class SkipZoom(gym.Wrapper):
 
     def reset(self, seed=None, options=None):
         self.env.reset(seed=seed)
-        for _ in range(10):
+        for _ in range(50):
             obs, _, done, _, _ = self.env.step([0,0,0])
         return obs, {}
 

@@ -42,7 +42,7 @@ def build_parser():
 
 def train_SAC(params):
     date = datetime.now()
-    save_path = "./logs/" + params['env_name'] + f"_{date.month}{date.day}_{params['exp_name']}"
+    save_path = "./logs/" + params['env_name'] + f"_{date.month:02}{date.day:02}_{params['exp_name']}"
 
     if torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -57,17 +57,23 @@ def train_SAC(params):
     env = wrap_CarRacingObst(env)
 
     # Initialize SAC
-    model = SAC(policy="CnnPolicy",
-                env=env,
-                learning_rate=params['learning_rate'],
-                buffer_size=params['replay_buffer_size'],
-                learning_starts=params['learning_starts'],
-                batch_size=params['train_batch_size'],
-                gamma=params['learning_rate'],
-                tensorboard_log=save_path,
-                verbose=1,
-                device=device)
+    if params['pre_trained_mdl']:
+        mdl_path = "logs/" + params['pre_trained_mdl'] + "/best_model.zip"
+        model = SAC.load(mdl_path)
+        model.set_env(env)
+    else:
+        model = SAC(policy="CnnPolicy",
+                    env=env,
+                    learning_rate=params['learning_rate'],
+                    buffer_size=params['replay_buffer_size'],
+                    learning_starts=params['learning_starts'],
+                    batch_size=params['train_batch_size'],
+                    gamma=params['learning_rate'],
+                    tensorboard_log=save_path,
+                    verbose=1,
+                    device=device)
 
+    # for evaluation
     eval_callback = EvalCallback(env,
                                  best_model_save_path=save_path,
                                  log_path=save_path,

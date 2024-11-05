@@ -8,7 +8,7 @@ from datetime import datetime
 
 
 if __name__ == "__main__":
-    env_name = "CarRacing-obstacles"
+    env_name = "CarRacing"
     device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
     print(f"Using device: {device}")
 
@@ -19,7 +19,6 @@ if __name__ == "__main__":
     # Initialize SAC
     model = SAC(policy="CnnPolicy",
                 env=env,
-                buffer_size=400000,
                 verbose=1,
                 device=device)
 
