@@ -4,7 +4,7 @@ import torch
 import CarRacingObstacles.obstacle_ver
 import CarRacingObstacles.obstacle_obj
 from CarRacingObstacles.wrappers import wrap_CarRacingObst
-from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback
 from datetime import datetime
 
 
@@ -59,8 +59,9 @@ def train_SAC(params):
     # Initialize SAC
     if params['pre_trained_mdl']:
         mdl_path = "logs/" + params['pre_trained_mdl'] + "/best_model.zip"
-        model = SAC.load(mdl_path)
+        model = SAC.load(mdl_path, device=device)
         model.set_env(env)
+        model.tensorboard_log = save_path
     else:
         model = SAC(policy="CnnPolicy",
                     env=env,
@@ -82,8 +83,13 @@ def train_SAC(params):
                                  deterministic=True,
                                  render=False)
 
+    checkpoint_callback = CheckpointCallback(save_freq=100000,
+                                             save_path=save_path,
+                                             name_prefix="Checkpoint")
+    CallBack = [eval_callback, checkpoint_callback]
+
     # Train the model
-    model.learn(total_timesteps=params['n_iter'], callback=eval_callback) #
+    model.learn(total_timesteps=params['n_iter'], callback=CallBack, reset_num_timesteps=True) #
 
     # Save the model
     # model.save("sac_car_racing")

@@ -63,14 +63,13 @@ class CarRacingObstacles_v2(CarRacing):
         # reward -= self.car.wheels[0].brake * 0.2
 
         # early stop
-        # if len(self.contacting) == 0:  # if get off road
-        #     # reward -= 0.2
-        #     self.off += 1
-        #     # print(self.off)
-        #     if self.off > 50:
-        #         terminated = True
-        # else:
-        #     self.off = 0
+        if len(self.contacting) == 0:  # if get off road
+            reward -= 0.1 # if v =/= 0, less
+            self.off += 1
+            if self.off > 200:
+                terminated = True
+        else:
+            self.off = 0
 
         if self.collideObst:
             reward -= 0.5
@@ -174,7 +173,7 @@ class CarRacingObstacles_v2(CarRacing):
                 )
             obs_fixture.filterData.categoryBits = OBSTACLE_CATEGORY  # 障礙物類別
             obs_fixture.filterData.maskBits = CAR_CATEGORY
-            obstacle.mass = 25.0
+            obstacle.mass = 100.0
 
             obstacle.userData = obstacle
             obstacle.color = np.array([255, 0, 0])
