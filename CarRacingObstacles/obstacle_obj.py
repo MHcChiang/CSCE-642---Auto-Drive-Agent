@@ -25,6 +25,7 @@ TRACK_WIDTH = 40 / SCALE
 
 OBSTACLE_CATEGORY = 0x0040  # 障礙物範疇
 CAR_CATEGORY = 0x0060  # 汽車範疇
+ROAD_CATEGORY = 0x001
 
 
 def CarRacingObst(**kwargs):
@@ -60,20 +61,28 @@ class CarRacingObstacles_v2(CarRacing):
         obs, reward, terminated, truncated, _ = super().step(action)
 
         # reward -= 0.05 * np.min([self.car.wheels[0].brake, self.car.wheels[0].gas])  # self.car.wheels[0].brake * 0.05
-        # reward -= self.car.wheels[0].brake * 0.2
+        # reward -= self.car.wheels[0].brake * 0.1
 
-        # early stop
-        if len(self.contacting) == 0:  # if get off road
-            reward -= 0.1 # if v =/= 0, less
-            self.off += 1
-            if self.off > 200:
-                terminated = True
-        else:
-            self.off = 0
+        # # early stop
+        # if len(self.contacting) == 0:  # if get off road
+        #     reward -= 0.05  # add: if v =/= 0, less
+        # #     self.off += 1
+        # #     if self.off > 150:
+        # #         terminated = True
+        # #         reward = -1000
+        # # else:
+        # #     self.off = 0
+        #
+        # if self.collideObst:
+        #     reward -= 0.05
+        #     # print(f"hit, reward: {reward}")
 
-        if self.collideObst:
-            reward -= 0.5
-            # print(f"hit, reward: {reward}")
+        # speed penalty # 只懲罰低速
+        true_speed = np.sqrt(
+            np.square(self.car.hull.linearVelocity[0])
+            + np.square(self.car.hull.linearVelocity[1])
+        )
+        reward -= np.max([0.1 - true_speed*(0.08/15), 0])
 
         return obs, reward, terminated, truncated, {}
 
@@ -162,21 +171,22 @@ class CarRacingObstacles_v2(CarRacing):
 
         for i, track_ind in enumerate(obstables_loc_ind):
             alpha1, beta1, x1, y1 = self.track[track_ind]
-            o_width = TRACK_WIDTH / (6 - self.np_random.uniform(0, 2))
+            o_width = TRACK_WIDTH / (5 - self.np_random.uniform(0, 2))
 
             obstacle = self.world.CreateDynamicBody(position=(x1, y1))
             obs_fixture = obstacle.CreateFixture(
                 shape=Box2D.b2PolygonShape(box=(o_width/2, o_width/2)),
                 density=5.0,
-                friction=0.5,
-                restitution=0.5,
+                friction=10.0,
+                restitution=0.3,
                 )
-            obs_fixture.filterData.categoryBits = OBSTACLE_CATEGORY  # 障礙物類別
-            obs_fixture.filterData.maskBits = CAR_CATEGORY
+            obstacle.linearDamping = 1.0
+            obs_fixture.filterData.categoryBits = OBSTACLE_CATEGORY
+            obs_fixture.filterData.maskBits = CAR_CATEGORY #| ROAD_CATEGORY
             obstacle.mass = 100.0
 
             obstacle.userData = obstacle
-            obstacle.color = np.array([255, 0, 0])
+            # obstacle.color = np.array([255, 0, 0])
             obstacle.obs_id = i
 
             self.obstacles_size.append(o_width)
@@ -184,7 +194,7 @@ class CarRacingObstacles_v2(CarRacing):
 
         for fixture in self.car.hull.fixtures:
             fixture.filterData.categoryBits = CAR_CATEGORY
-            fixture.filterData.maskBits = OBSTACLE_CATEGORY | 0x001
+            fixture.filterData.maskBits = OBSTACLE_CATEGORY | ROAD_CATEGORY
             fixture.restitution = 0.1
 
     def _render(self, mode: str):
@@ -249,23 +259,26 @@ class CarRacingObstacles_v2(CarRacing):
             return self.isopen
 
     def _render_obstacles(self, zoom, translation, angle):
-        """
-        :param zoom: same
-        :param translation: same
-        :param angle: same
-        :return: None
-        """
-        color = (255, 0, 0)
+        color = (199, 97, 20)
         for i, obstacle in enumerate(self.obstacles):
             position = obstacle.position
             x, y = position.x, position.y
             o_width = self.obstacles_size[i]
-            # print(type(x), type(o_width))
             obst_poly = [(x + o_width / 2, y + o_width / 2),
                          (x + o_width / 2, y - o_width / 2),
                          (x - o_width / 2, y - o_width / 2),
                          (x - o_width / 2, y + o_width / 2)]
             self._draw_colored_polygon(self.surf, obst_poly, color, zoom, translation, angle)
+            cross_poly = [(x + o_width / 2, y + o_width / 2),
+                         (x + o_width / 2, y + o_width *3/8),
+                         (x - o_width *3/8, y - o_width / 2),
+                         (x - o_width / 2, y - o_width / 2)]
+            self._draw_colored_polygon(self.surf, cross_poly, (128,42,42), zoom, translation, angle)
+            cross_poly = [(x + o_width / 2, y - o_width / 2),
+                          (x + o_width / 2, y - o_width * 3 / 8),
+                          (x - o_width * 3 / 8, y + o_width / 2),
+                          (x - o_width / 2, y + o_width / 2)]
+            self._draw_colored_polygon(self.surf, cross_poly, (128, 42, 42), zoom, translation, angle)
 
     def _destroy(self):
         if not self.road:
@@ -350,7 +363,7 @@ if __name__ == "__main__":
     # 建立環境，最大單一回合長度設定為600 steps，視情況自己加長
     continuous = True
     render_mode = 'human'  #'rgb_array' #
-    env = gym.make("CarRacing-obstaclesV2", continuous=continuous, render_mode=render_mode, max_episode_steps=500)
+    env = gym.make("CarRacing-obstaclesV2", continuous=continuous, render_mode=render_mode, max_episode_steps=1500)
 
     # 設定pygame以接收鍵盤輸入
     pygame.init()
