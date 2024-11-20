@@ -3,11 +3,13 @@ import gymnasium as gym
 import gymnasium.spaces
 import numpy as np
 import collections
+from gymnasium import spaces
 import CarRacingObstacles.obstacle_ver
 import CarRacingObstacles.obstacle_obj
 
 
 def wrap_CarRacingObst(env):
+    # env = MergeGasBrake(env)
     # env = MaxAndSkipEnv(env)
     env = SkipZoom(env)
 
@@ -20,6 +22,28 @@ def wrap_CarRacingObst(env):
     return env
 
 
+class MergeGasBrake(gym.Wrapper):
+    def __init__(self, env=None):
+        super(MergeGasBrake, self).__init__(env)
+        # most recent raw observations (for max pooling across time steps)
+        if self.continuous:
+            self.action_space = spaces.Box(
+                np.array([-1, -1]).astype(np.float32),
+                np.array([+1, +1]).astype(np.float32),
+            )  # steer, gas+brake
+
+    def step(self, action):
+        # merge brake and gas
+        if action[1] >=0:
+            gas = action[1]
+            brake = 0
+        else:
+            gas = 0
+            brake = -action[1]
+        action = np.array([action[0], gas, brake])
+        return self.env.step(action)
+
+
 class SkipZoom(gym.Wrapper):
     def __init__(self, env=None):
         """For environments where the user need to press FIRE for the game to start."""
@@ -28,7 +52,7 @@ class SkipZoom(gym.Wrapper):
     def reset(self, seed=None, options=None):
         self.env.reset(seed=seed)
         for _ in range(50):
-            obs, _, done, _, _ = self.env.step([0,0,0])
+            obs, _, done, _, _ = self.env.step(np.zeros(self.action_space.shape[0]))
         return obs, {}
 
 
@@ -132,6 +156,7 @@ class ResizeFrame(gym.ObservationWrapper):
         img = cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
         img = np.reshape(img, [size, size, 3])
         return img.astype(np.uint8)
+
 
 
 if __name__ == "__main__":

@@ -6,9 +6,9 @@ from gymnasium.envs.box2d.car_dynamics import Car
 import Box2D
 import pygame
 from gymnasium.envs.registration import register
-from CarRacingObstacles.utils import polygons_intersect
 from gymnasium.utils import seeding
 from Box2D.b2 import fixtureDef, polygonShape, revoluteJointDef
+
 
 
 STATE_W = 96  # less than Atari 160x192
@@ -56,34 +56,31 @@ class CarRacingObstacles_v2(CarRacing):
             maskBits=0x0060,
         )
         self.collideObst = False
+        self.off = 0
+
 
     def step(self, action):
         obs, reward, terminated, truncated, _ = super().step(action)
 
-        # reward -= 0.05 * np.min([self.car.wheels[0].brake, self.car.wheels[0].gas])  # self.car.wheels[0].brake * 0.05
-        # reward -= self.car.wheels[0].brake * 0.1
+        # if action is not None:
+        #     reward -= action[2]^2 * 0.1
 
-        # # early stop
-        # if len(self.contacting) == 0:  # if get off road
-        #     reward -= 0.05  # add: if v =/= 0, less
-        # #     self.off += 1
-        # #     if self.off > 150:
-        # #         terminated = True
-        # #         reward = -1000
-        # # else:
-        # #     self.off = 0
-        #
+        if len(self.contacting) == 0:  # if get off road
+            # reward -= 0.02  # add: if v =/= 0, less
+            pass
+        else:
+            # self.off = 0
+            if action is not None:
+                reward -= np.tanh(action[2]) * 0.1
+            # true_speed = np.sqrt(
+            #     np.square(self.car.hull.linearVelocity[0])
+            #     + np.square(self.car.hull.linearVelocity[1])
+            # )
+            # # reward -= np.max([0.1 - true_speed*(0.08/15), 0])# 只懲罰低速
+            # reward += true_speed/100
         # if self.collideObst:
         #     reward -= 0.05
-        #     # print(f"hit, reward: {reward}")
-
-        # speed penalty # 只懲罰低速
-        true_speed = np.sqrt(
-            np.square(self.car.hull.linearVelocity[0])
-            + np.square(self.car.hull.linearVelocity[1])
-        )
-        reward -= np.max([0.1 - true_speed*(0.08/15), 0])
-
+        # print(reward)
         return obs, reward, terminated, truncated, {}
 
     def reset(
@@ -157,7 +154,7 @@ class CarRacingObstacles_v2(CarRacing):
         :return:
         """
         # 以一定間距生成障礙物
-        num_obstacles = 15
+        num_obstacles = self.np_random.integers(3, 8)
         max_ind_step = len(self.track) / num_obstacles
         min_ind_step = 10
         if max_ind_step < min_ind_step:
@@ -180,7 +177,7 @@ class CarRacingObstacles_v2(CarRacing):
                 friction=10.0,
                 restitution=0.3,
                 )
-            obstacle.linearDamping = 1.0
+            obstacle.linearDamping = 0.5
             obs_fixture.filterData.categoryBits = OBSTACLE_CATEGORY
             obs_fixture.filterData.maskBits = CAR_CATEGORY #| ROAD_CATEGORY
             obstacle.mass = 100.0
@@ -195,7 +192,7 @@ class CarRacingObstacles_v2(CarRacing):
         for fixture in self.car.hull.fixtures:
             fixture.filterData.categoryBits = CAR_CATEGORY
             fixture.filterData.maskBits = OBSTACLE_CATEGORY | ROAD_CATEGORY
-            fixture.restitution = 0.1
+            fixture.restitution = 0.5
 
     def _render(self, mode: str):
         assert mode in self.metadata["render_modes"]
@@ -364,7 +361,6 @@ if __name__ == "__main__":
     continuous = True
     render_mode = 'human'  #'rgb_array' #
     env = gym.make("CarRacing-obstaclesV2", continuous=continuous, render_mode=render_mode, max_episode_steps=1500)
-
     # 設定pygame以接收鍵盤輸入
     pygame.init()
     obs, _ = env.reset(seed=0)
@@ -379,19 +375,22 @@ if __name__ == "__main__":
         # 針對上下左右鍵分配action
         # discrete actions: do nothing, steer left, steer right, gas, brake.
         action = 0
+        # steer = 0
         if continuous:
-            steer, brake = 0, 0
+            # steer = 0
+            brake = 0
             if keys[pygame.K_UP]:
                 gas += 0.01  #
             elif keys[pygame.K_DOWN]:
-                gas -= 0.01
+                gas -= 0.016
             if keys[pygame.K_LEFT]:
-                steer = -0.2
+                steer -= 0.02
             elif keys[pygame.K_RIGHT]:
-                steer = 0.2
+                steer += 0.02
             if keys[pygame.K_SPACE]:
                 brake = 1.0
             gas = np.clip(gas, 0, 1.0)
+
             action = [steer, gas, brake]
         else:
             if keys[pygame.K_UP]:
