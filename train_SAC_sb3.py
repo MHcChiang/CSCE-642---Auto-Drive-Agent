@@ -6,6 +6,7 @@ import CarRacingObstacles.obstacle_obj
 from CarRacingObstacles.wrappers import wrap_CarRacingObst
 from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback
 from datetime import datetime
+from CarRacingObstacles.utils import EvalCallbackStep, wrap_eval_env
 
 
 def build_parser():
@@ -16,18 +17,20 @@ def build_parser():
     parser.add_argument('--exp_name', type=str, default='todo')
     # environment para
     parser.add_argument('--env_name', type=str, default="CarRacing-obstaclesV2")
-    parser.add_argument('--ep_len', type=int, default=1500)
+    parser.add_argument('--ep_len', type=int, default=1000)
 
     # training para
     parser.add_argument('--n_iter', '-n', type=int, default=1000000)
-    parser.add_argument('--learning_starts', '-b', type=int, default=100)  # steps collected per train iteration
+    parser.add_argument('--learning_starts', '-ls', type=int, default=100)  # steps collected per train iteration
     parser.add_argument('--train_batch_size', '-tb', type=int, default=256)  # steps used per gradient step
-    parser.add_argument('--replay_buffer_size', '-rbs', type=int, default=500000)
+    parser.add_argument('--replay_buffer_size', '-rbs', type=int, default=1000000)
     parser.add_argument('--init_temperature', '-temp', type=float, default=1.0)
     parser.add_argument('--learning_rate', '-lr', type=float, default=3e-4)
     parser.add_argument('--critic_target_update_frequency', type=int, default=1)
+    parser.add_argument('--gamma', type=float, default=0.99)
+    parser.add_argument('--train_freq', '-tf', type=int, default=1)
+    parser.add_argument('--grad_steps', '-gs', type=int, default=1)
     # parser.add_argument('--discount', type=float, default=0.99)
-    # parser.add_argument('--tau', '-lr', type=float, default=3e-4)
     # parser.add_argument('--n_layers', '-l', type=int, default=2)
     # parser.add_argument('--size', '-s', type=int, default=64)
 
@@ -55,33 +58,37 @@ def train_SAC(params):
     # Create CarRacing environment
     env = gym.make(params['env_name'], max_episode_steps=params['ep_len'])
     env = wrap_CarRacingObst(env)
+    eval_env = wrap_eval_env(env)
 
     # Initialize SAC
+    model = SAC(policy="CnnPolicy",
+                env=env,
+                learning_rate=lambda progress: params['learning_rate'] * progress + 0.0003, #params['learning_rate'],  #
+                buffer_size=params['replay_buffer_size'],
+                learning_starts=params['learning_starts'],
+                batch_size=params['train_batch_size'],
+                gamma=params['gamma'],
+                train_freq=params['train_freq'],
+                gradient_steps=params['grad_steps'],
+                tensorboard_log=save_path,
+                verbose=1,
+                device=device)
+
     if params['pre_trained_mdl']:
-        mdl_path = "logs/" + params['pre_trained_mdl'] + "/best_model.zip"
-        model = SAC.load(mdl_path, device=device)
-        model.set_env(env)
-        model.tensorboard_log = save_path
-    else:
-        model = SAC(policy="CnnPolicy",
-                    env=env,
-                    learning_rate=params['learning_rate'],
-                    buffer_size=params['replay_buffer_size'],
-                    learning_starts=params['learning_starts'],
-                    batch_size=params['train_batch_size'],
-                    gamma=params['learning_rate'],
-                    tensorboard_log=save_path,
-                    verbose=1,
-                    device=device)
+        mdl_path = "logs/" + params['pre_trained_mdl'] #+ "/best_model.zip"
+        model.set_parameters(mdl_path)
+        # model = SAC.load(mdl_path, device=device)
+        # model.set_env(env)
+        # model.tensorboard_log = save_path
 
     # for evaluation
-    eval_callback = EvalCallback(env,
-                                 best_model_save_path=save_path,
-                                 log_path=save_path,
-                                 eval_freq=params['eval_freq'],
-                                 n_eval_episodes=params['eval_episodes'],
-                                 deterministic=True,
-                                 render=False)
+    eval_callback = EvalCallbackStep(eval_env,
+                                     best_model_save_path=save_path,
+                                     log_path=save_path,
+                                     eval_freq=params['eval_freq'],
+                                     n_eval_episodes=params['eval_episodes'],
+                                     deterministic=True,
+                                     render=False)
 
     checkpoint_callback = CheckpointCallback(save_freq=100000,
                                              save_path=save_path,
