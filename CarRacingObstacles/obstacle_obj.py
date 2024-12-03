@@ -45,6 +45,8 @@ class CarRacingObstacles_v2(CarRacing):
     """
 
     def __init__(self, **kwargs):
+        self._n_obst = kwargs.pop("n_obst", 5)
+        print(self._n_obst)
         super().__init__(**kwargs)
         self.obstacles = []
         self.obstacles_size = []
@@ -56,31 +58,46 @@ class CarRacingObstacles_v2(CarRacing):
             maskBits=0x0060,
         )
         self.collideObst = False
-        self.off = 0
-
+        self.off = None
+        self.t_stop = 0
+        self.print_info = self.reward
 
     def step(self, action):
         obs, reward, terminated, truncated, _ = super().step(action)
 
-        # if action is not None:
-        #     reward -= action[2]^2 * 0.1
-
+        true_speed = np.sqrt(
+            np.square(self.car.hull.linearVelocity[0])
+            + np.square(self.car.hull.linearVelocity[1])
+        )
+        w = abs(self.car.hull.angularVelocity)
+        # reward += np.tanh((true_speed - 5) / 15) * 0.1  # type 1
+        # reward += (-1 * ((true_speed-25)/20)**2 + 1) * 0.2 # type 2
+        # speed_rew = 0.5*np.tanh((true_speed-5)/5) + 0.5*np.tanh((-true_speed+40)/5) - 0.5
+        # reward += speed_rew * 0.5
+        r_m = np.tanh(true_speed/20) * (0.5-np.tanh(w/3))
+        reward += r_m * 0.2
+        if true_speed < 10:
+            reward -= 0.001 * (10-true_speed)
+        # Off Road
         if len(self.contacting) == 0:  # if get off road
-            # reward -= 0.02  # add: if v =/= 0, less
-            pass
-        else:
-            # self.off = 0
-            if action is not None:
-                reward -= np.tanh(action[2]) * 0.1
-            # true_speed = np.sqrt(
-            #     np.square(self.car.hull.linearVelocity[0])
-            #     + np.square(self.car.hull.linearVelocity[1])
-            # )
-            # # reward -= np.max([0.1 - true_speed*(0.08/15), 0])# 只懲罰低速
-            # reward += true_speed/100
-        # if self.collideObst:
-        #     reward -= 0.05
-        # print(reward)
+            reward -= 0.2
+
+        if self.collideObst:
+            reward -= 0.2
+
+        # Slow speed Early stop
+        # terminated = self._low_speed_es(true_speed)
+
+        if action is not None:
+            reward -= abs(action[0]) * 0.05  # steer cost
+            # reward -= action[1] * 0.05  # gas cost
+            if true_speed <= 10:
+                if action[2] >= 0 or action[1] <= 0.1:
+                    reward -= 0.15
+
+        # Slow
+        self.print_info = self.reward
+        # print(self.car.hull.angularVelocity)
         return obs, reward, terminated, truncated, {}
 
     def reset(
@@ -88,7 +105,7 @@ class CarRacingObstacles_v2(CarRacing):
             *,
             seed: Optional[int] = None,
             options: Optional[dict] = None,
-    ):
+     ):
         """
             加入了obstacles建構函式
         """
@@ -133,6 +150,7 @@ class CarRacingObstacles_v2(CarRacing):
         self.contacting.clear()
         self.collideObst = False
         self.off = 0
+        self.t_stop = 0
 
         return self.step(None)[0], {}
 
@@ -148,13 +166,15 @@ class CarRacingObstacles_v2(CarRacing):
         else:
             return self._render(self.render_mode)
 
+    def add_obst(self, n_obst):
+        self._n_obst += n_obst
+
     def _create_obstacles(self):
         """
-        以一定間距在跑道上生成 15 個障礙物
-        :return:
+        以一定間距在跑道上生成障礙物
         """
         # 以一定間距生成障礙物
-        num_obstacles = self.np_random.integers(3, 8)
+        num_obstacles = self.np_random.integers(self._n_obst, 2 * self._n_obst)
         max_ind_step = len(self.track) / num_obstacles
         min_ind_step = 10
         if max_ind_step < min_ind_step:
@@ -241,6 +261,13 @@ class CarRacingObstacles_v2(CarRacing):
         text_rect.center = (60, WINDOW_H - WINDOW_H * 2.5 / 40.0)
         self.surf.blit(text, text_rect)
 
+        # Showing stop
+        # font = pygame.font.Font(pygame.font.get_default_font(), 32)
+        # text_t = font.render("%04i" % self.t_stop, True, (255, 0, 0), (0, 0, 0))
+        # text_rect_t = text.get_rect()
+        # text_rect_t.center = (50, WINDOW_H - WINDOW_H * 2.5 / 18.0)
+        # self.surf.blit(text_t, text_rect_t)
+
         if mode == "human":
             pygame.event.pump()
             self.clock.tick(self.metadata["render_fps"])
@@ -289,6 +316,16 @@ class CarRacingObstacles_v2(CarRacing):
         assert self.car is not None
         self.car.destroy()
 
+    def _low_speed_es(self, true_speed):
+        self.t_stop = 0
+        terminated = False
+
+        if true_speed <= 2:
+            self.t_stop += 1
+            if self.t_stop >= 100:
+                terminated = True
+        return terminated
+
 
 class FrictionDetectorObstacles(FrictionDetector):
     def __init__(self, env, lap_complete_percent):
@@ -322,7 +359,7 @@ class FrictionDetectorObstacles(FrictionDetector):
 
         if tile:
             # inherit tile color from env
-            tile.color[:] = self.env.road_color
+            tile.color[:] = self.env.road_color  # (52,68,49) #
             if not obj or "tiles" not in obj.__dict__:
                 return
 
@@ -360,7 +397,7 @@ if __name__ == "__main__":
     # 建立環境，最大單一回合長度設定為600 steps，視情況自己加長
     continuous = True
     render_mode = 'human'  #'rgb_array' #
-    env = gym.make("CarRacing-obstaclesV2", continuous=continuous, render_mode=render_mode, max_episode_steps=1500)
+    env = gym.make("CarRacing-obstaclesV2", continuous=continuous, render_mode=render_mode, max_episode_steps=1500, n_obst=15)
     # 設定pygame以接收鍵盤輸入
     pygame.init()
     obs, _ = env.reset(seed=0)

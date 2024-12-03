@@ -4,14 +4,13 @@ import gymnasium.spaces
 import numpy as np
 import collections
 from gymnasium import spaces
-import CarRacingObstacles.obstacle_ver
 import CarRacingObstacles.obstacle_obj
 
 
 def wrap_CarRacingObst(env):
-    # env = MergeGasBrake(env)
+    env = MergeGasBrake(env)
     # env = MaxAndSkipEnv(env)
-    env = SkipZoom(env)
+    # env = SkipZoom(env)
 
     # env = ProcessFrame(env)
     env = ResizeFrame(env)
@@ -31,6 +30,7 @@ class MergeGasBrake(gym.Wrapper):
                 np.array([-1, -1]).astype(np.float32),
                 np.array([+1, +1]).astype(np.float32),
             )  # steer, gas+brake
+        print("Using Merge Brake and Gas Wrapper")
 
     def step(self, action):
         # merge brake and gas
@@ -46,8 +46,8 @@ class MergeGasBrake(gym.Wrapper):
 
 class SkipZoom(gym.Wrapper):
     def __init__(self, env=None):
-        """For environments where the user need to press FIRE for the game to start."""
         super(SkipZoom, self).__init__(env)
+        print("wrap with skip zoom")
 
     def reset(self, seed=None, options=None):
         self.env.reset(seed=seed)
@@ -165,7 +165,7 @@ if __name__ == "__main__":
     # 建立環境，最大單一回合長度設定為600 steps，視情況自己加長
     continuous = True
     render_mode = 'rgb_array'  #'human' #
-    env = gym.make("CarRacing-obstaclesV2", continuous=continuous, render_mode=render_mode, max_episode_steps=1200)
+    env = gym.make("CarRacing-obstaclesV2", continuous=continuous, render_mode=render_mode, max_episode_steps=1000)
     env = wrap_CarRacingObst(env)
     print(f"action space: {env.action_space.low}~{env.action_space.high}, type: {type(env.action_space.high)}")
     # 設定pygame以接收鍵盤輸入
@@ -179,8 +179,8 @@ if __name__ == "__main__":
     while True:
         # img = np.moveaxis(obs, 0, 2)
         img = obs
-        cv2.imshow('obs_visualize', img)
-        cv2.waitKey()
+        # cv2.imshow('obs_visualize', img)
+        # cv2.waitKey()
         step += 1
         # print(f"step: {step}")
         # 檢查否有按鍵輸入
@@ -213,3 +213,4 @@ if __name__ == "__main__":
         # clock.tick(30)
         if terminated or truncated:
             obs, _ = env.reset()
+

@@ -1,6 +1,5 @@
 import gymnasium as gym
 from stable_baselines3 import SAC
-import CarRacingObstacles.obstacle_ver
 import CarRacingObstacles.obstacle_obj
 from CarRacingObstacles.wrappers import wrap_CarRacingObst
 from CarRacingObstacles.utils import wrap_eval_env
@@ -9,19 +8,24 @@ import os
 
 
 if __name__ == "__main__":
-    mdl_name = "CarRacing-obstaclesV2_1116_OrgFew_MergeGB"
-    check = 10 * 10000 # None
+    mdl_name = "CarRacing-obstaclesV2_1129_Ts0ApSteer2"
+    check = None #40 * 10000 # None
+    best = 33 * 10000
+    env_name = "CarRacing-obstaclesV2"  # 'CarRacing-v2'
     save_VOD = False
     seed = 1
 
     # Initialize SAC
     if check:
         mdl_path = "logs/" + mdl_name + f"/Checkpoint_{check}_steps.zip"
+    elif best:
+        mdl_path = "logs/" + mdl_name + f"/best_model_{best}.zip"
     else:
-        mdl_path = "logs/" + mdl_name + "/best_model.zip"
+        mdl_path = "logs/" + mdl_name + f"/best_model.zip"
+
     model = SAC.load(mdl_path)
-    env_name = "CarRacing-obstaclesV2"  # 'CarRacing-v2'
     done = False
+    print(model.policy.critic)
 
     if save_VOD:
         # Create CarRacing environment
@@ -51,13 +55,13 @@ if __name__ == "__main__":
 
     else:
         # Create CarRacing environment
-        env = gym.make(env_name, render_mode='human', max_episode_steps=1000)
+        env = gym.make(env_name, render_mode='human', max_episode_steps=1500)
         env = wrap_CarRacingObst(env)
-        env = wrap_eval_env(env)
-        obs = env.reset()
+        obs, _ = env.reset(seed=seed)
 
         while not done:
             action, _states = model.predict(obs, deterministic=True)
-            obs, reward, done, info = env.step(action)
-            print(action)
+            obs, reward, terminated, truncated, info = env.step(action)
+            done = truncated or terminated
+            # print(action)
             env.render()
