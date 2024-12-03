@@ -18,4 +18,3 @@ The usage of other .py files are as follows:
 1. eval_sb3_mdl.py: evaluate the model and display the process.
 2. eval_mdl_arg.py: same as the former, but with arg parse.
 3. plot_log: plot the training logs with matplotlib.
-4.  
