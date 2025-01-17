@@ -8,17 +8,26 @@ In addition to the original observation, which consists of a top-down 96x96 RGB 
 
 # Run 
 The training code is implemented using [Stable-Baselines3](https://stable-baselines3.readthedocs.io/en/master/index.html).
-To run training code, simply run following command after install requirment:
+
+## Steps to Run Training
+
+To run training code, 
+1.	Ensure the required dependencies are installed.
+2.	Run the training script with the following command:
 ```
 python train_SAC_sb3.py  --exp_name test_run 
 ```
-To monitor training, you can use tensorboard by following command:
+
+## Monitoring Training
+To monitor the training process, use TensorBoard by running:
 ```
 tensorboard --logdir path/to/file
 ```
-The resulting agent will be saved at the directory "logs". To evaulate it, run 
+
+## Evaluating the Trained Agent
+The resulting trained agent will be saved in the logs directory. To evaluate the agent, execute the following command with the model directory. For example, to evaluate the model in logs/CarRacing_Example, run
 ```
-python eval_mdl_arg.py --mdl "directory of model"
+python eval_mdl_arg.py --mdl logs/CarRacing_Example/best_model_175000.zip
 ```
 
 ![trained_display](https://github.com/user-attachments/assets/4b9c6091-4105-471f-8a88-2ee5b10ce1f1)
