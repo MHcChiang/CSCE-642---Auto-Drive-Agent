@@ -4,21 +4,43 @@ import gymnasium.spaces
 import numpy as np
 import collections
 from gymnasium import spaces
+from gymnasium.spaces import Dict, Box
 import CarRacingObstacles.obstacle_obj
 
 
 def wrap_CarRacingObst(env):
     env = MergeGasBrake(env)
+
     # env = MaxAndSkipEnv(env)
     # env = SkipZoom(env)
-
-    # env = ProcessFrame(env)
-    env = ResizeFrame(env)
-
-    # env = ImageToPyTorch(env)
-    # env = BufferWrapper(env, 4)
-    # env = ScaledFloatFrame(env)
+    env = ResizeFrame(env, 48)
+    env = AddMeasurementObs(env)
     return env
+
+
+class AddMeasurementObs(gym.ObservationWrapper):
+    def __init__(self, env=None):
+        super(AddMeasurementObs, self).__init__(env, )
+
+        self.observation_space = Dict({
+            "image": env.observation_space,  # 圖像空間來自原始環境
+            "data": Box(low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32)  # 新增數值觀察空間
+        })
+
+    def observation(self, obs):
+        measure = np.array([self.env.true_speed,
+                            self.env.car.wheels[0].omega,
+                            self.env.car.wheels[1].omega,
+                            self.env.car.wheels[2].omega,
+                            self.env.car.wheels[3].omega,
+                            self.env.car.wheels[0].joint.angle,
+                            self.env.car.hull.angularVelocity],
+                           dtype=np.float32)
+
+        return {
+            "image": obs,
+            "data": measure
+        }
 
 
 class MergeGasBrake(gym.Wrapper):
@@ -85,61 +107,6 @@ class MaxAndSkipEnv(gym.Wrapper):
         return obs, {}
 
 
-class ProcessFrame(gym.ObservationWrapper):
-    def __init__(self, env=None):
-        super(ProcessFrame, self).__init__(env)
-        self.size = 72
-        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(self.size, self.size, 1), dtype=np.uint8)
-
-
-    def observation(self, obs):
-        return ProcessFrame.process(obs, self.size)
-
-    @staticmethod
-    def process(frame, size):
-        # 轉換色彩通道
-        img = np.reshape(frame, [96, 96, 3]).astype(np.float32)
-        # 轉成灰階
-        img = img[:, :, 0] * 0.299 + img[:, :, 1] * 0.587 + img[:, :, 2] * 0.114
-        img = cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
-        img = np.reshape(img, [size, size, 1])
-        return img.astype(np.uint8)
-
-
-class ImageToPyTorch(gym.ObservationWrapper):
-    def __init__(self, env):
-        super(ImageToPyTorch, self).__init__(env)
-        old_shape = self.observation_space.shape
-        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=(old_shape[-1], old_shape[0], old_shape[1]),
-                                                dtype=np.float32)
-
-    def observation(self, observation):
-        return np.moveaxis(observation, 2, 0)
-
-
-class ScaledFloatFrame(gym.ObservationWrapper):
-    def observation(self, obs):
-        return np.array(obs).astype(np.float32) / 255.0
-
-
-class BufferWrapper(gym.ObservationWrapper):
-    def __init__(self, env, n_steps, dtype=np.float32):
-        super(BufferWrapper, self).__init__(env)
-        self.dtype = dtype
-        old_space = env.observation_space
-        self.observation_space = gym.spaces.Box(old_space.low.repeat(n_steps, axis=0),
-                                                old_space.high.repeat(n_steps, axis=0), dtype=dtype)
-
-    def reset(self, seed=None, options=None):
-        self.buffer = np.zeros_like(self.observation_space.low, dtype=self.dtype)
-        return self.observation(self.env.reset(seed=seed)[0]), {}
-
-    def observation(self, observation):
-        self.buffer[:-1] = self.buffer[1:]
-        self.buffer[-1] = observation
-        return self.buffer
-
-
 class ResizeFrame(gym.ObservationWrapper):
     def __init__(self, env=None, size=48):
         super(ResizeFrame, self).__init__(env, )
@@ -151,7 +118,6 @@ class ResizeFrame(gym.ObservationWrapper):
 
     @staticmethod
     def process(frame, size):
-        # 轉換色彩通道
         img = np.reshape(frame, [96, 96, 3]).astype(np.float32)
         img = cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
         img = np.reshape(img, [size, size, 3])
@@ -177,10 +143,10 @@ if __name__ == "__main__":
 
     step=0
     while True:
-        # img = np.moveaxis(obs, 0, 2)
-        img = obs
-        # cv2.imshow('obs_visualize', img)
-        # cv2.waitKey()
+        img = obs['image']
+        # img = np.moveaxis(img, 0, 2)
+        cv2.imshow('obs_visualize', img)
+        cv2.waitKey()
         step += 1
         # print(f"step: {step}")
         # 檢查否有按鍵輸入

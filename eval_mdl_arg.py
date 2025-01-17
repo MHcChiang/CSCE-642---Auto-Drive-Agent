@@ -1,6 +1,5 @@
 import gymnasium as gym
 from stable_baselines3 import SAC
-import CarRacingObstacles.obstacle_ver
 import CarRacingObstacles.obstacle_obj
 from CarRacingObstacles.wrappers import wrap_CarRacingObst
 from CarRacingObstacles.utils import wrap_eval_env
@@ -14,7 +13,7 @@ def build_parser():
     parser.add_argument('--mdl', type=str, default=None)
     parser.add_argument('--env_name', type=str, default="CarRacing-obstaclesV2")
     parser.add_argument('--save_VOD', action='store_true')
-    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--seed', type=int, default=1)
 
     args = parser.parse_args()
     params = vars(args)
@@ -33,7 +32,7 @@ if __name__ == "__main__":
 
     if params['save_VOD']:
         # Create CarRacing environment
-        env = gym.make(params['env_name'], render_mode='rgb_array', max_episode_steps=1500)
+        env = gym.make(params['env_name'], render_mode='rgb_array', max_episode_steps=1000)
         env = wrap_CarRacingObst(env)
         # model.set_env(env)  # This can use the same wrappers of training
         obs, _ = env.reset(seed=params['seed'])
@@ -68,5 +67,4 @@ if __name__ == "__main__":
         while not done:
             action, _states = model.predict(obs, deterministic=True)
             obs, reward, done, info = env.step(action)
-            print(action)
             env.render()

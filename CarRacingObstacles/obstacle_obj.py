@@ -65,35 +65,38 @@ class CarRacingObstacles_v2(CarRacing):
     def step(self, action):
         obs, reward, terminated, truncated, _ = super().step(action)
 
-        true_speed = np.sqrt(
+        self.true_speed = np.sqrt(
             np.square(self.car.hull.linearVelocity[0])
             + np.square(self.car.hull.linearVelocity[1])
         )
-        w = abs(self.car.hull.angularVelocity)
+        # w = abs(self.car.hull.angularVelocity)
         # reward += np.tanh((true_speed - 5) / 15) * 0.1  # type 1
         # reward += (-1 * ((true_speed-25)/20)**2 + 1) * 0.2 # type 2
+
         # speed_rew = 0.5*np.tanh((true_speed-5)/5) + 0.5*np.tanh((-true_speed+40)/5) - 0.5
         # reward += speed_rew * 0.5
-        r_m = np.tanh(true_speed/20) * (0.5-np.tanh(w/3))
-        reward += r_m * 0.2
-        if true_speed < 10:
-            reward -= 0.001 * (10-true_speed)
+
+        # r_m = np.tanh(true_speed/20) * (0.5-np.tanh(w/3))
+        # reward += r_m * 0.2
+        # if true_speed < 10:
+        #     reward -= 0.001 * (10-true_speed)
+
         # Off Road
         if len(self.contacting) == 0:  # if get off road
-            reward -= 0.2
-
+            reward -= 0.5
+        #
         if self.collideObst:
-            reward -= 0.2
+            reward -= 10
 
         # Slow speed Early stop
-        # terminated = self._low_speed_es(true_speed)
+        # terminated, penalty = self._low_speed_es()
+        # reward -= penalty
 
         if action is not None:
-            reward -= abs(action[0]) * 0.05  # steer cost
-            # reward -= action[1] * 0.05  # gas cost
-            if true_speed <= 10:
-                if action[2] >= 0 or action[1] <= 0.1:
-                    reward -= 0.15
+            reward -= abs(action[0]) * 0.1  # steer cost
+        #     if self.true_speed <= 10:
+        #         if action[2] >= 0 or action[1] <= 0.1:
+        #             reward -= 0.15
 
         # Slow
         self.print_info = self.reward
@@ -195,7 +198,7 @@ class CarRacingObstacles_v2(CarRacing):
                 shape=Box2D.b2PolygonShape(box=(o_width/2, o_width/2)),
                 density=5.0,
                 friction=10.0,
-                restitution=0.3,
+                restitution=0.8,
                 )
             obstacle.linearDamping = 0.5
             obs_fixture.filterData.categoryBits = OBSTACLE_CATEGORY
@@ -261,7 +264,7 @@ class CarRacingObstacles_v2(CarRacing):
         text_rect.center = (60, WINDOW_H - WINDOW_H * 2.5 / 40.0)
         self.surf.blit(text, text_rect)
 
-        # Showing stop
+        # # Showing stop
         # font = pygame.font.Font(pygame.font.get_default_font(), 32)
         # text_t = font.render("%04i" % self.t_stop, True, (255, 0, 0), (0, 0, 0))
         # text_rect_t = text.get_rect()
@@ -316,15 +319,18 @@ class CarRacingObstacles_v2(CarRacing):
         assert self.car is not None
         self.car.destroy()
 
-    def _low_speed_es(self, true_speed):
-        self.t_stop = 0
+    def _low_speed_es(self):
         terminated = False
-
-        if true_speed <= 2:
+        penalty = 0
+        if self.true_speed <= 2:
             self.t_stop += 1
             if self.t_stop >= 100:
                 terminated = True
-        return terminated
+                self.t_stop = 0
+                penalty = 100
+        else:
+            self.t_stop = 0
+        return terminated, penalty
 
 
 class FrictionDetectorObstacles(FrictionDetector):

@@ -6,6 +6,7 @@ from CarRacingObstacles.wrappers import wrap_CarRacingObst
 from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback
 from datetime import datetime
 from CarRacingObstacles.utils import EvalCallbackStep, wrap_eval_env
+from gymnasium.spaces import Dict, Box
 
 
 def build_parser():
@@ -55,12 +56,21 @@ def train_SAC(params):
     print(f"Using device: {device}")
 
     # Create CarRacing environment
-    env = gym.make(params['env_name'], max_episode_steps=params['ep_len'], continuous=True)
+    env = gym.make(params['env_name'], max_episode_steps=params['ep_len'], continuous=True, n_obst=6)
     env = wrap_CarRacingObst(env)
     eval_env = wrap_eval_env(env)
 
+    # policy type
+    policy = None
+    if isinstance(env.observation_space, Box):
+        print("The observation space is a Box (continuous), use CnnPolicy.")
+        policy = "CnnPolicy"
+    elif isinstance(env.observation_space, Dict):
+        print("The observation space is a Dict (dictionary of spaces) use MultiInputPolicy.")
+        policy = "MultiInputPolicy"
+
     # Initialize SAC
-    model = SAC(policy="CnnPolicy",
+    model = SAC(policy=policy,
                 env=env,
                 learning_rate=params['learning_rate'],  #lambda progress: params['learning_rate'] * progress + 0.0001, #
                 buffer_size=params['replay_buffer_size'],
@@ -73,6 +83,8 @@ def train_SAC(params):
                 tensorboard_log=save_path,
                 verbose=1,
                 device=device)
+    print(model.policy.critic)
+    print(model.policy.actor)
 
     if params['pre_trained_mdl']:
         print("Loading pre-trained model")
