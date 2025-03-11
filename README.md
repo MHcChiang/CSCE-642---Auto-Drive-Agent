@@ -32,3 +32,5 @@ python eval_mdl_arg.py --mdl logs/CarRacing_Example/best_model_175000.zip
 
 ![trained_display](https://github.com/user-attachments/assets/4b9c6091-4105-471f-8a88-2ee5b10ce1f1)
 
+Full demo on [Youtube](https://youtu.be/IQ5TPY_vpKc)
+
